@@ -1,0 +1,1 @@
+CreateObject("WScript.Shell").Popup "Simulation failed!", 300, "Warning", 48
