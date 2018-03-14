@@ -4,107 +4,96 @@ use IEEE.NUMERIC_STD.ALL;
 use work.utils.all;
 
 entity dwt_1 is
-    Generic ( WIDTH    : positive := 16;
-              SYMBOLS  : positive := 128 );
-    Port (    clk, rst : in  STD_LOGIC;
-              valid_in : in  BOOLEAN;
-              a        : in  SIGNED(WIDTH-1 downto 0);
-              s, d     : out SIGNED(WIDTH-1 downto 0)
-              );
+    Generic ( 
+        WIDTH   : positive;
+        SYMBOLS : positive
+    );
+    Port (
+        clk, rst     : in  STD_LOGIC;
+        valid_in     : in  BOOLEAN;
+        x_in         : in  SIGNED(WIDTH-1 downto 0);
+        --valid_out    : out BOOLEAN;
+        a_out, d_out : out SIGNED(WIDTH-1 downto 0)
+    );
 end dwt_1;
 
 architecture logic of dwt_1 is
-
--- Control
-  type state_t is (INIT, PROCESSING);
-signal state : state_t := INIT;
-signal cnt_init : natural range 0 to 3 := 0;
-signal cnt : NATURAL range 0 to SYMBOLS := 0;
-signal d_sel  : BOOLEAN;
-
--- Data
-  type buff_t is array (0 to 3) of SIGNED(WIDTH-1 downto 0);
-signal buff : buff_t; -- Input buffer (shiftreg)
-signal d_r, s_r : SIGNED(WIDTH-1 downto 0);
-
-signal smooth : SIGNED(WIDTH   downto 0);
-signal d_prev : SIGNED(WIDTH-1 downto 0);
-signal detail : SIGNED(WIDTH   downto 0);
-
-begin
-
-comb : process(buff, cnt, d_prev, d_r) is
-    variable cnt_std : STD_LOGIC_VECTOR(log2ceil(SYMBOLS+1) downto 0);
-    variable s_next  : SIGNED(WIDTH-1 downto 0);
-    variable s_det   : SIGNED(smooth'Range);
-    variable d_sum   : SIGNED(WIDTH downto 0);
-    variable s_sum   : SIGNED(WIDTH downto 0);
-begin
-    if cnt = SYMBOLS-2
-        then s_next := buff(2);
-        else s_next := buff(0);
-    end if;
-    d_sum := (s_next(WIDTH-1) & s_next) + (buff(2)(WIDTH-1) & buff(2));
-    s_sum := (d_prev(d_prev'High) & d_prev) + (d_r(d_r'High) & d_r) + 2;
-
-    detail <= buff(1) - shift_right(d_sum,1);
-    smooth <= buff(3) + shift_right(s_sum,2);
-
-    cnt_std := std_logic_vector(to_unsigned(cnt, cnt_std'length));
-    d_sel <= cnt_std(0) = '0'; -- Calculate detail on odd numbered counter values;
-end process comb;
-
-sync : process (clk, rst, valid_in)
-    variable d_left : SIGNED(WIDTH downto 0);
-begin
-    if (rst = '1') then
-        s_r    <= to_signed(0,    s_r'length);
-        d_r    <= to_signed(0,    d_r'length);
-        d_prev <= to_signed(0, d_prev'length);
-        buff   <= (OTHERS => to_signed(0,buff(0)'length));
-        cnt <= 0;
-        cnt_init <= 0;
-        state <= INIT;
-    elsif (rising_edge(clk) and valid_in) then
-        -- Shift in data
-        buff <= (a & buff(0 to buff'High-1));
     
-        case state is
-
-            when INIT =>
-                if cnt_init = 2 then
-                    state <= PROCESSING;
-                    cnt_init <= cnt_init;
+    subtype component_t is SIGNED(WIDTH-1 downto 0);
+    
+    -- Control
+    signal d_sel, first, last : boolean;
+    
+    -- Data
+    type x_buff_t is array (0 to 3) of component_t;
+    signal x_buff                  : x_buff_t; -- Input buffer (shiftreg)
+    signal a_sum, u_dif            : SIGNED(WIDTH downto 0);
+    signal u_dif_pre, d_reg, a_reg : component_t;
+    
+begin
+    
+    ctrl : entity work.dwt_1_ctrl
+        generic map (SYMBOLS => SYMBOLS)
+        port map (
+            clk       => clk,
+            rst       => rst,
+            valid_in  => valid_in,
+            --valid_out => valid_out,
+            d_sel     => d_sel,
+            first     => first,
+            last      => last
+        );
+    
+    comb : process(x_buff, u_dif_pre, d_reg, last) is
+        variable x_e_nxt      : component_t;
+        variable p_out, u_sum : SIGNED(WIDTH downto 0);
+    begin
+        
+        if last then
+            x_e_nxt := x_buff(2);
+        else 
+            x_e_nxt := x_buff(0);
+        end if;
+        
+        p_out := (x_e_nxt(WIDTH-1) & x_e_nxt) + (x_buff(2)(WIDTH-1) & x_buff(2));
+        u_sum := (u_dif_pre(u_dif_pre'High) & u_dif_pre) + (d_reg(d_reg'High) & d_reg) + 2;
+        
+        u_dif <= x_buff(1) - shift_right(p_out,1);
+        a_sum <= x_buff(3) + shift_right(u_sum,2);
+    end process comb;
+    
+    sync : process (clk, rst, valid_in)
+        variable d_left : SIGNED(WIDTH downto 0);
+    begin
+        if (rst = '1') then
+            a_reg     <= to_signed(0, a_reg'length);
+            d_reg     <= to_signed(0, d_reg'length);
+            u_dif_pre <= to_signed(0, u_dif_pre'length);
+            x_buff    <= (OTHERS => to_signed(0,x_buff(0)'length));
+        elsif (rising_edge(clk) and valid_in) then
+            -- Shift in data
+            x_buff <= (x_in & x_buff(0 to x_buff'High-1));
+            if d_sel then --predict
+                a_reg <= a_reg;
+                d_reg <= u_dif(WIDTH-1 downto 0);
+                
+                -- The first u_dif coefficient needs to be stored
+                -- to avoid out of range lookup.
+                if first then -- first u_dif
+                    u_dif_pre <= u_dif(WIDTH-1 downto 0);
                 else
-                    state <= state;
-                    cnt_init <= cnt_init+1;
+                    u_dif_pre <= d_reg;
                 end if;
-
-            when PROCESSING =>
-                if d_sel then
-                    s_r <= s_r;
-                    d_r <= detail(WIDTH-1 downto 0);
-
-                    -- The first detail coefficient needs to be stored
-                    -- to avoid out of range lookup.
-                    if cnt = 0 then -- first detail
-                        d_prev <= detail(WIDTH-1 downto 0);
-                    else
-                        d_prev <= d_r;
-                    end if;
-
-                else
-                    s_r <= smooth(WIDTH-1 downto 0);
-                    d_r <= d_r;
-                end if;
-                cnt <= (cnt + 1) mod SYMBOLS;
-
-        end case;
-    end if;
-end process sync;
-
--- Output
-d <= d_r;
-s <= s_r;
-
+                
+            else --update
+                a_reg <= a_sum(WIDTH-1 downto 0);
+                d_reg <= d_reg;
+            end if;
+        end if;
+    end process sync;
+    
+    -- Output
+    d_out <= d_reg;
+    a_out <= a_reg;
+    
 end logic;

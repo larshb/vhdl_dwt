@@ -31,14 +31,14 @@ reg input_read=0, golden_read=1;
 
 initial begin
   // Input data file
-  input_file = $fopen("../dat/raw.dat", "r");
+  input_file = $fopen("raw.dat", "r");
   if (input_file == 0) begin
     $display("input_file handle was NULL");
     $finish;
   end
   
   // Golden data file (Expected output)
-  golden_file = $fopen("../dat/dwt2.dat", "r");
+  golden_file = $fopen("dwt2.dat", "r");
   if (golden_file == 0) begin
     $display("golden_file handle was NULL");
     $finish;
@@ -79,7 +79,9 @@ always @(posedge CLK) begin
       $display("*************************************");
       $display("*        Simulation finished        *");
       $display("*                                   *");
-      $display("*   Errors:           %d   *", errors);
+      $display("*   Clock freq.:  ",      "%d MHz   *", 1000/PERIOD);
+      $display("*   Time: ",           $time," ns   *");
+      $display("*   Errors:           ",      "%d   *", errors);
       $display("*************************************");
       $finish;
     end

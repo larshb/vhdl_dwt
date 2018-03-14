@@ -3,6 +3,7 @@ CALL xvhdl --nolog^
  ../rtl/utils.vhd^
  ../rtl/pipe.vhd^
  ../rtl/mem.vhd^
+ ../rtl/dwt_1_ctrl.vhd^
  ../rtl/dwt_1.vhd^
  ../rtl/dwt_2.vhd
 IF %ERRORLEVEL% NEQ 0 GOTO FAIL
@@ -20,11 +21,16 @@ SET /P CONFIRMATION=Continue with simulation? (Y/[N])?
 IF /I "%CONFIRMATION%" NEQ "Y" GOTO CLEAN
 
 :ELABORATE
-CALL xelab --nolog dwt_2_tb -s sim_snap
+REM -wto disables WebTALK
+CALL xelab -wto --nolog dwt_2_tb -s sim_snap
 IF %ERRORLEVEL% NEQ 0 GOTO FAIL
 
+:COPYDATA
+REM Copy data files into working directory
+COPY ..\dat .
+
 :SIMULATE
-CALL xsim --nolog -R sim_snap
+CALL xsim --nolog -R --onerror quit sim_snap
 IF %ERRORLEVEL% NEQ 0 GOTO FAIL
 
 :SUCCESS
