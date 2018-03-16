@@ -50,6 +50,8 @@ architecture logic of dwt_2 is
     
     signal valid_o_bool, last_o_bool, rdy_i_reg : boolean;
     
+    signal halt : boolean;
+    
 begin
     
     x_in        <= signed(rd_data) when v_stage else signed(din);
@@ -121,9 +123,11 @@ begin
     wr_data      <= std_logic_vector(signed(d_out)) when a_sel else std_logic_vector(signed(a_out));
     
     sync : process (clk, rst)
+    sync : process (clk, rst, halt)
         variable col_h : unsigned(addr_width/2-1 downto 0);
     begin
         if rst = '1' then
+        if rst = '1' or halt then --TOOD  :   Sync halt
             rdy_i_reg       <= true;
             row             <= to_unsigned(0, row'length);
             col             <= to_unsigned(0, col'length);
@@ -132,6 +136,7 @@ begin
             v_stage         <= false;
             a_sel           <= false;
             v_dly           <= (others => false);
+            halt            <= false;
         elsif rising_edge(clk) then
             
             -- Registers
@@ -141,6 +146,7 @@ begin
             stage_last_d    <= stage_last and wr_en_v;
             read_out_enable <= read_out_enable or stage_last_d;
             rd_addr         <= std_logic_vector(col & row);
+            halt            <= halt or last_o_bool;
             rdy_i_reg       <= (not stage_last_reg) and rdy_i_reg;
             
             -- Memory control
