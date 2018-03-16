@@ -48,7 +48,7 @@ architecture logic of dwt_2 is
     type v_dly_t is array (0 to pipe_delay-1) of boolean;
     signal v_dly : v_dly_t;
     
-    signal valid_o_bool : boolean;
+    signal valid_o_bool, last_o_bool, rdy_i_reg : boolean;
     
 begin
     
