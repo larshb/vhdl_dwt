@@ -12,6 +12,8 @@ entity dwt_2 is
         rst     : in  STD_LOGIC;
         valid_i : in  STD_LOGIC;
         valid_o : out STD_LOGIC;
+        rdy_i   : out STD_LOGIC;
+        rdy_o   : in  STD_LOGIC; -- TODO :  Fix handshake
         last_o  : out STD_LOGIC;
         din     : in  STD_LOGIC_VECTOR (WIDTH-1 downto 0);
         dout    : out STD_LOGIC_VECTOR (WIDTH-1 downto 0));
@@ -122,6 +124,7 @@ begin
         variable col_h : unsigned(addr_width/2-1 downto 0);
     begin
         if rst = '1' then
+            rdy_i_reg       <= true;
             row             <= to_unsigned(0, row'length);
             col             <= to_unsigned(0, col'length);
             v_enable        <= false;
@@ -138,6 +141,7 @@ begin
             stage_last_d    <= stage_last and wr_en_v;
             read_out_enable <= read_out_enable or stage_last_d;
             rd_addr         <= std_logic_vector(col & row);
+            rdy_i_reg       <= (not stage_last_reg) and rdy_i_reg;
             
             -- Memory control
             if valid_i = '1' or v_enable or stage_last then
@@ -168,5 +172,6 @@ begin
     -- Output
     valid_o <= '1' when valid_o_bool else '0';
     last_o  <= '1' when stage_last_d and valid_o_bool else '0';
+    rdy_i <= '1' when rdy_i_reg else '0';
     
 end logic;
