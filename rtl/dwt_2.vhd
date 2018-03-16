@@ -42,7 +42,7 @@ architecture logic of dwt_2 is
     signal row, col : unsigned(addr_width/2-1 downto 0);
     
     -- Control
-    signal stage_last, stage_last_d : boolean; --horizontal, then vertical, 1D-DWT
+    signal stage_last, stage_last_reg : boolean; --horizontal, then vertical, 1D-DWT
     signal v_enable, v_stage, read_out_enable : boolean;
     
     type v_dly_t is array (0 to pipe_delay-1) of boolean;
@@ -111,7 +111,7 @@ begin
         );
     
         valid_1dh : entity work.pipe generic map (STAGES => pipe_delay+1 ) --Extra cycle delay?
-        port map ( clk                                   => clk, din(0) => valid_i, dout(0) => wr_en_h_sl );
+        port map ( clk => clk, din(0) => valid_i, dout(0) => wr_en_h_sl );
     
     addr_pipe : entity work.pipe
         generic map ( STAGES => pipe_delay )
@@ -119,14 +119,13 @@ begin
     
     stage_last   <= (col = SYMBOLS-1 and row = SYMBOLS-1);
     wr_en_v      <= v_dly(v_dly'high);
-    valid_o_bool <= read_out_enable;
     wr_data      <= std_logic_vector(signed(d_out)) when a_sel else std_logic_vector(signed(a_out));
+    valid_o_bool <= read_out_enable;
+    last_o_bool  <= stage_last_reg and valid_o_bool;
     
-    sync : process (clk, rst)
     sync : process (clk, rst, halt)
         variable col_h : unsigned(addr_width/2-1 downto 0);
     begin
-        if rst = '1' then
         if rst = '1' or halt then --TOOD  :   Sync halt
             rdy_i_reg       <= true;
             row             <= to_unsigned(0, row'length);
@@ -143,8 +142,8 @@ begin
             v_dly           <= v_enable & v_dly(0 to v_dly'high-1);
             v_enable        <= v_enable or stage_last;
             v_stage         <= v_enable;
-            stage_last_d    <= stage_last and wr_en_v;
-            read_out_enable <= read_out_enable or stage_last_d;
+            stage_last_reg  <= stage_last and wr_en_v;
+            read_out_enable <= read_out_enable or stage_last_reg;
             rd_addr         <= std_logic_vector(col & row);
             halt            <= halt or last_o_bool;
             rdy_i_reg       <= (not stage_last_reg) and rdy_i_reg;
@@ -177,7 +176,7 @@ begin
     
     -- Output
     valid_o <= '1' when valid_o_bool else '0';
-    last_o  <= '1' when stage_last_d and valid_o_bool else '0';
+    last_o  <= '1' when last_o_bool else '0';
     rdy_i <= '1' when rdy_i_reg else '0';
     
 end logic;
