@@ -5,11 +5,12 @@ CALL xvhdl --nolog^
  ../rtl/mem.vhd^
  ../rtl/dwt_1_ctrl.vhd^
  ../rtl/dwt_1.vhd^
- ../rtl/dwt_2.vhd
+ ../rtl/dwt_2.vhd^
+ ../rtl/axis_dwt2.vhd
 IF %ERRORLEVEL% NEQ 0 GOTO FAIL
 
 CALL xvlog --nolog^
- ../tb/dwt_2_tb.v
+ ../tb/axis_dwt2_tb.v
 IF %ERRORLEVEL% NEQ 0 GOTO FAIL
 
 echo [101;102m Compilation successfull! [0m
@@ -22,7 +23,7 @@ IF /I "%CONFIRMATION%" NEQ "Y" GOTO CLEAN
 
 :ELABORATE
 REM -wto disables WebTALK
-CALL xelab -wto --nolog dwt_2_tb -s sim_snap
+CALL xelab -wto --nolog axis_dwt2_tb -s sim_snap
 IF %ERRORLEVEL% NEQ 0 GOTO FAIL
 
 :COPYDATA
