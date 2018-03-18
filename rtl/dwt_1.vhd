@@ -59,7 +59,7 @@ begin
         u_sum := (u_dif_pre(u_dif_pre'High) & u_dif_pre) + (d_reg(d_reg'High) & d_reg) + 2;
         
         u_dif <= x_buff(1) - shift_right(p_out,1);
-        a_sum <= resize(x_buff(3), a_sum'Length) + shift_right(u_sum,2); -- TODO: Verify
+        a_sum <= resize(x_buff(3), a_sum'Length) + resize(shift_right(u_sum,2), a_sum'Length); -- Avoid overflow
     end process comb;
     
     sync : process (clk, rst, valid_in)
